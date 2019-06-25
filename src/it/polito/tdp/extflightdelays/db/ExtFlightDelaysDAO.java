@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import it.polito.tdp.extflightdelays.model.Airline;
 import it.polito.tdp.extflightdelays.model.Airport;
@@ -91,4 +92,40 @@ public class ExtFlightDelaysDAO {
 			throw new RuntimeException("Error Connection Database");
 		}
 	}
+
+	public List<Collegamento> getAllEdges(int migliaMedieMax, Map<Integer, Airport> airportIdMap) {
+		String sql = "SELECT a1.ID AS airport1, a2.ID AS airport2, AVG(f.distance) AS avgg "
+				+ "FROM flights f, airports a1, airports a2 WHERE f.ORIGIN_AIRPORT_ID = a1.ID "
+				+ "AND f.DESTINATION_AIRPORT_ID = a2.ID GROUP BY a1.ID, a2.ID HAVING avgg > ?  "
+				+ "ORDER BY avgg";
+		List<Collegamento> result = new LinkedList<>();
+
+		try {
+			Connection conn = ConnectDB.getConnection();
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, migliaMedieMax);
+			ResultSet rs = st.executeQuery();
+
+			while (rs.next()) {
+				Airport a1 = airportIdMap.get(rs.getInt("airport1"));
+				Airport a2 = airportIdMap.get(rs.getInt("airport2"));
+				double distance = rs.getDouble("avgg");
+				if(result.contains(new Collegamento(a2, a1))) {
+					int i = result.indexOf(new Collegamento(a2, a1));
+					result.get(i).setPeso(distance+result.get(i).getPeso());
+				} else {
+					result.add(new Collegamento(a1, a2, distance));
+				}
+			}
+
+			conn.close();
+			return result;
+
+		} catch (SQLException e) {
+			e.printStackTrace();
+			System.out.println("Errore connessione al database");
+			throw new RuntimeException("Error Connection Database");
+		}
+	}
+
 }
